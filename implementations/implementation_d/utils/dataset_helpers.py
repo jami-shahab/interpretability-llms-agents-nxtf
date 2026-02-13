@@ -88,7 +88,7 @@ def save_dataset(dataset: Dataset, save_dir: str):
 
 
 def preview_samples(dataset: Dataset, n: int = 3):
-    print("\n🔍 Sample examples:")
+    print("\n Sample examples:")
     for i in range(min(n, len(dataset))):
         print(f"\n--- Sample {i} ---")
         print(dataset[i]["prompt"])

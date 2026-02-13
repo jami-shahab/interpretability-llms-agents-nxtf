@@ -44,10 +44,10 @@ pip install -r dpo_req.txt
 pip install flash-attn==2.7.3 --no-build-isolation
 ```
 
-<!-- 6. **Register the environment as a Jupyter kernel**
+6. **Register the environment as a Jupyter kernel**
 ```bash
 python -m ipykernel install --user --name dpo_env --display-name "dpo_env"
-``` -->
+```
 
 ## Notes
 
