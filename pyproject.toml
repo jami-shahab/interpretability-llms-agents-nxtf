@@ -80,6 +80,7 @@ ref1-refresher-interpretability = [
     "lore-sa",
     "xlrd>=2.0.2",
     "grad-cam>=1.5.5",
+    "language-evaluation",
 ]
 
 ref2-transparency-xai-toxicity = [
@@ -119,6 +120,7 @@ required-environments = [
 aieng-topic-impl = { workspace = true }
 baukit = { git = "https://github.com/davidbau/baukit", rev = "9d51abd51ebf29769aecc38c4cbef459b731a36e" }
 lore-sa = { git = "https://github.com/kdd-lab/LORE_sa.git", rev = "main" }
+language-evaluation = { git = "https://github.com/bckim92/language-evaluation.git" }
 
 [tool.mypy]
 ignore_missing_imports = true
