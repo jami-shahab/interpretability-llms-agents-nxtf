@@ -23,6 +23,9 @@ dependencies = [
     "torch==2.2.2",
     "transformers==4.38.2",
     "tqdm==4.67.3",
+    "matplotlib>=3.10.8",
+    "rich>=14.3.3",
+    "kaggle>=1.7.4.5",
 ]
 
 [build-system]

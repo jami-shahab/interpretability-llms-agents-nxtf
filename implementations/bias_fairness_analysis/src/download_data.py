@@ -54,7 +54,9 @@ def load_civil(
 ) -> pd.DataFrame:
     """Load the CivilComments dataset."""
     ds = load_dataset(
-        "google/civil_comments", split=split, streaming=stream, trust_remote_code=True
+        "google/civil_comments", 
+        split=split, 
+        streaming=stream,
     )
     cols_keep = [
         "text",
