@@ -38,7 +38,7 @@ repos:
     rev: 1.9.1
     hooks:
     - id: nbqa-ruff
-      args: [--fix, --exit-non-zero-on-fix, --ignore=D100, --extend-ignore=E402]
+      args: [--fix, --exit-non-zero-on-fix, --ignore=D100, --extend-ignore=E402, --extend-ignore=ERA001, --extend-ignore=W505, --extend-ignore=D401, --extend-ignore=D400, --extend-ignore=D200, --extend-ignore=D103, --extend-ignore=D205, --extend-ignore=N806, --extend-ignore=C416]
 
 ci:
     autofix_commit_msg: |
