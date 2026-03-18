@@ -73,6 +73,8 @@ xai-refresher = [
     "tensorflow>=2.21.0",
     "xl-vlm",
     "xlrd>=2.0.2",
+    "captum>=0.8.0",
+    "bertviz>=1.4.1",
 ]
 
 [tool.uv.workspace]

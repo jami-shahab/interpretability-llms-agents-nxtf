@@ -185,8 +185,8 @@ source .venv/bin/activate
 > **CUDA note:** `torch==2.6.0` from PyPI includes CUDA support on Linux. If you specifically need the CUDA 12.4 build, run:
 >
 > ```bash
-> uv sync --group preference-alignment \
->   --index-url https://download.pytorch.org/whl/cu124
+> uv sync --group ref4-llm-alignment-ethics \
+>   --index-url https://download.pytorch.org/whl/cu124 # Not required for Linux users, but may be needed for Windows users
 > ```
 
 ### Installing `flash-attn` (optional, for faster attention)
