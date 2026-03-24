@@ -21,6 +21,7 @@ members = [
     "aieng-llm-interp",
     "interpretability-llms-agents",
 ]
+overrides = [{ name = "xl-vlm", marker = "python_full_version >= '3.12'", git = "https://github.com/mshukor/xl-vlms.git?rev=3bd525b070066a52ad974b1ba1c5c206342cb708" }]
 
 [[package]]
 name = "absl-py"
@@ -2069,6 +2070,7 @@ multimedia-rag = [
 ]
 preference-alignment = [
     { name = "jsonlines" },
+    { name = "pydantic-settings" },
     { name = "trl" },
     { name = "unsloth" },
     { name = "unsloth-zoo" },
@@ -2147,6 +2149,7 @@ multimedia-rag = [
 ]
 preference-alignment = [
     { name = "jsonlines", specifier = ">=4.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "trl", specifier = ">=0.22.2" },
     { name = "unsloth", specifier = ">=2026.3.4" },
     { name = "unsloth-zoo", specifier = ">=2026.3.2" },

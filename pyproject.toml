@@ -62,6 +62,7 @@ multimedia-rag = [
 ]
 preference-alignment = [
     "jsonlines>=4.0.0",
+    "pydantic-settings>=2.0.0",
     "trl>=0.22.2",
     "unsloth>=2026.3.4",
     "unsloth-zoo>=2026.3.2",
@@ -101,6 +102,9 @@ conflicts = [
     {group = "xai-refresher"},
     {group = "mechanistic-interp"},
   ],
+]
+override-dependencies = [
+    "xl-vlm==0; python_version >= '3.12'",
 ]
 
 [tool.uv.sources]
