@@ -200,6 +200,33 @@ implementations/xai_refresher/
 
 ---
 
+## Model Preparation (LIME Notebook)
+
+The [lime.ipynb](lime.ipynb) notebook uses **DSEG-LIME**, which requires the **SAM (Segment Anything Model)** checkpoint to be placed manually before running.
+
+### `models/pretrained/` — SAM Checkpoint
+
+1. Create the directory and download the ViT-H checkpoint from the [SAM model checkpoints page](https://github.com/facebookresearch/segment-anything?tab=readme-ov-file#model-checkpoints):
+
+   ```bash
+   mkdir -p implementations/xai_refresher/models/pretrained
+   cd implementations/xai_refresher/models/pretrained
+   wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
+   ```
+
+2. After setup, your directory should contain:
+
+   ```
+   implementations/xai_refresher/
+   └── models/
+       └── pretrained/
+           └── sam_vit_h_4b8939.pth
+   ```
+
+> **Note:** The notebook references the checkpoint at `./models/pretrained/sam_vit_h_4b8939.pth`. Adapt the path in the notebook if you place it elsewhere.
+
+---
+
 ## Getting Started
 
 1. From the **root of the repository**, install the `xai-refresher` dependency group using `uv`:
