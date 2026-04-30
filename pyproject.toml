@@ -34,6 +34,15 @@ agentic-xai-eval = [
     "openinference-instrumentation-openai>=0.1.0",
     "streamlit>=1.55.0",
 ]
+sme-capital-eval = [
+    "crewai>=1.6.1",
+    "google-genai>=1.67.0",
+    "json-repair>=0.25.0",
+    "streamlit>=1.55.0",
+    "faiss-cpu>=1.7.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+]
 dev = [
     "aieng-platform-onboard>=0.6.3",
     "codecov>=2.1.13",
@@ -191,4 +200,4 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["implementations/agentic_vqa_eval/src"]
+where = ["implementations/agentic_vqa_eval/src", "implementations/sme_capitalAllocation/src"]
