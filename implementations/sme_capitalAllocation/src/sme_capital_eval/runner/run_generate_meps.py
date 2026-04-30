@@ -304,10 +304,10 @@ def process_case(
 def main() -> None:
     """Parse CLI arguments and run the MEP generation pipeline."""
     parser = argparse.ArgumentParser(description="Generate MEPs for SME Capital Allocation")
-    parser.add_argument("--provider", default="gemini", choices=["gemini", "ollama"],
+    parser.add_argument("--provider", default="gemini", choices=["gemini", "ollama", "openai"],
                         help="LLM provider (default: gemini)")
     parser.add_argument("--model", default=None,
-                        help="Model name. Defaults: gemini-2.0-flash-lite (Gemini), gemma4:e2b (Ollama)")
+                        help="Model name. Defaults: gemini-2.0-flash-lite / gemma4:e2b / gpt-4o-mini")
     parser.add_argument("--ollama_url", default="http://localhost:11434",
                         help="Ollama server URL (only used with --provider ollama)")
     parser.add_argument("--split", default="test", choices=["test", "fewshot", "all"])
@@ -320,7 +320,8 @@ def main() -> None:
     # Resolve model default per provider
     model = args.model
     if model is None:
-        model = "gemma4:e2b" if args.provider == "ollama" else "gemini-2.0-flash-lite"
+        defaults = {"gemini": "gemini-2.0-flash-lite", "ollama": "gemma4:e2b", "openai": "gpt-4o-mini"}
+        model = defaults[args.provider]
 
     # Build the shared LLM adapter (injected into all 5 agents)
     llm_adapter: LLMAdapterPort = build_adapter(
