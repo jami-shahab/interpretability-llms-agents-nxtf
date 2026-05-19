@@ -25,7 +25,7 @@ def post_transaction_leverage(current_debt: float, new_debt: float, ebitda: floa
         Post-transaction leverage ratio; ``inf`` if EBITDA is zero.
     """
     if ebitda <= 0:
-        return float("inf")
+        return 9999.0  # sentinel: unconstrained leverage (JSON-safe, not float inf)
     return (current_debt + new_debt) / ebitda
 
 
@@ -75,7 +75,7 @@ def payback_years(capex: float, annual_uplift: float) -> float:
         Payback years; ``inf`` if annual_uplift is zero or negative.
     """
     if annual_uplift <= 0:
-        return float("inf")
+        return 9999.0  # sentinel: infinite payback (JSON-safe, not float inf)
     return capex / annual_uplift
 
 
@@ -186,4 +186,7 @@ class FinancialCalcTool(BaseTool):
         except Exception as exc:
             return json.dumps({"error": str(exc)})
 
-        return json.dumps({"operation": operation, "result": round(result, 6)})
+        # JSON does not support Infinity — replace with a large sentinel so the
+        # Gemini API doesn't reject the tool-result payload with 400 INVALID_ARGUMENT
+        safe_result = 9999.0 if result == float("inf") else (-9999.0 if result == float("-inf") else round(result, 6))
+        return json.dumps({"operation": operation, "result": safe_result})

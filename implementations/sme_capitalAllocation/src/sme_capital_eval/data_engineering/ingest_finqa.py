@@ -1,4 +1,8 @@
-"""Ingest FinQA dataset from HuggingFace and curate a static few-shot bank.
+"""Ingest FinQA dataset and curate a static few-shot bank.
+
+Downloads ``train.json`` directly from the official FinQA GitHub repository
+(czyssrs/FinQA) — the HuggingFace ``ibm-research/finqa`` dataset uses a loading
+script that is no longer supported by ``datasets >= 3.0``.
 
 Filters for samples that demonstrate leverage/ratio calculations, formats
 them into 4-part few-shot blocks, and writes to:
@@ -12,8 +16,9 @@ Usage:
 """
 
 import json
-import re
 from pathlib import Path
+
+import requests
 
 
 # parents[3] = implementations/sme_capitalAllocation/
@@ -22,6 +27,12 @@ _OUT_DIR = _ROOT / "data" / "processed"
 _CACHE_DIR = _ROOT / "data" / "raw" / "finqa"
 
 _OUT_FILE = _OUT_DIR / "finqa_fewshot_bank.jsonl"
+_CACHED_JSON = _CACHE_DIR / "train.json"
+
+# Official FinQA GitHub raw URL — czyssrs/FinQA repo
+_GITHUB_URL = (
+    "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/train.json"
+)
 
 # Keywords that indicate financial ratio / leverage calculations
 RATIO_KEYWORDS = [
@@ -52,12 +63,10 @@ def _format_fewshot(example: dict, idx: int) -> dict:
     steps = qa.get("steps", [])
     answer = str(qa.get("exe_ans", ""))
 
-    # Format steps as numbered list
     step_text = "\n".join(
         f"  Step {i+1}: {s}" for i, s in enumerate(steps)
     ) if steps else "  (No explicit steps recorded)"
 
-    # Build compact block
     block = (
         f"Q: {question}\n"
         f"Steps:\n{step_text}\n"
@@ -74,30 +83,39 @@ def _format_fewshot(example: dict, idx: int) -> dict:
 
 
 def run() -> None:
-    """Download FinQA, filter for ratio examples, write few-shot bank."""
+    """Download FinQA from GitHub, filter for ratio examples, write few-shot bank."""
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("Loading FinQA from HuggingFace (ibm-research/finqa) …")
-    try:
-        from datasets import load_dataset  # type: ignore
-        ds = load_dataset("ibm-research/finqa", split="train", cache_dir=str(_CACHE_DIR))
-    except Exception as exc:
-        print(f"  ERROR: Could not load FinQA: {exc}")
-        print("  Ensure 'datasets' is installed and network is available.")
-        _write_empty_bank()
-        return
+    # Load from cache if available
+    if _CACHED_JSON.exists():
+        print(f"  Using cached FinQA JSON: {_CACHED_JSON}")
+        with open(_CACHED_JSON) as f:
+            examples = json.load(f)
+    else:
+        print(f"  Downloading FinQA train.json from GitHub …")
+        print(f"  URL: {_GITHUB_URL}")
+        try:
+            resp = requests.get(_GITHUB_URL, timeout=60)
+            resp.raise_for_status()
+            examples = resp.json()
+            with open(_CACHED_JSON, "w") as f:
+                json.dump(examples, f)
+            print(f"  Cached to: {_CACHED_JSON}")
+        except Exception as exc:
+            print(f"  ERROR: Could not download FinQA: {exc}")
+            _write_empty_bank()
+            return
 
-    print(f"  Loaded {len(ds)} training examples")
+    print(f"  Loaded {len(examples)} training examples")
 
-    # Filter
-    filtered = [ex for ex in ds if _has_ratio_content(ex)]
+    # Filter for ratio/leverage content
+    filtered = [ex for ex in examples if _has_ratio_content(ex)]
     print(f"  After ratio/leverage filter: {len(filtered)} examples")
 
     # Sort by step count (prefer examples with explicit calculation steps)
     filtered.sort(key=lambda x: len(x.get("qa", {}).get("steps", [])), reverse=True)
 
-    # Take top MAX_EXAMPLES
     selected = filtered[:MAX_EXAMPLES]
     print(f"  Selected top {len(selected)} examples for few-shot bank")
 
@@ -108,7 +126,7 @@ def run() -> None:
 
     print(f"\nFinQA few-shot bank written to: {_OUT_FILE}")
 
-    # Print preview of first 2
+    # Preview first 2
     print("\nPreview (first 2 examples):")
     with open(_OUT_FILE) as f:
         for i, line in enumerate(f):

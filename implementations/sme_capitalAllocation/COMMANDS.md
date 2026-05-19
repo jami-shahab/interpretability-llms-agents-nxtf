@@ -78,7 +78,7 @@ uv run \
   --out meps/
 ```
 
-### Gemini — all 7 test cases (free plan: run on a fresh UTC day)
+### Gemini — all 7 test cases (free plan: use --delay to pace between cases)
 
 ```bash
 uv run \
@@ -90,6 +90,7 @@ uv run \
   --split test \
   --n 7 \
   --workers 1 \
+  --delay 5.0 \
   --out meps/
 ```
 
@@ -153,6 +154,10 @@ uv run \
 
 | `--provider` | Default `--model` | Key required | Rate limits |
 |---|---|---|---|
-| `gemini` | `gemini-2.0-flash-lite` | `GEMINI_API_KEY` | 1500 req/day free tier |
-| `openai` | `gpt-4o-mini` | `OPENAI_API_KEY` | Pay-per-token, no hard cap |
+| `gemini` | `gemini-2.0-flash-lite` | `GEMINI_API_KEY` | 1500 req/day free tier — use `--delay 5.0` |
+| `openai` | `gpt-4o-mini` | `OPENAI_API_KEY` | Pay-per-token, ~$0.04 total for 7 cases |
 | `ollama` | `gemma4:e2b` | None | None (local) |
+
+## Retry Behaviour
+
+All agent calls automatically retry up to 3 times on `429 RESOURCE_EXHAUSTED` with exponential backoff (10s → 20s → 40s). Use `--delay <seconds>` to add additional inter-case pacing on the Gemini free tier.

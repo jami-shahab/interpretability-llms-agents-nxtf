@@ -6,12 +6,25 @@ Uses the StatsCan Web Data Service (WDS) API:
   → JSON response with {"status":"SUCCESS","object": "<zip_url>"}
   → Download zip → extract CSV → clean → insert to SQLite.
 
+Column names confirmed by inspection of the downloaded CSVs:
+  34-10-0035-01:
+    NAICS : 'North American Industry Classification System (NAICS)'
+    type  : 'Capital and repair expenditures'
+    value : 'VALUE' (millions CAD)
+    date  : 'REF_DATE' (year, BOM-encoded as first col)
+
+  33-10-0500-01:
+    NAICS   : 'North American Industry Classification System (NAICS)'
+    measure : 'Balance sheet and income statement components, selected financial ratios'
+    value   : 'VALUE' (millions CAD)
+    date    : 'REF_DATE' (first col)
+
 Usage:
     uv run ... -m sme_capital_eval.data_engineering.ingest_statscan
 """
 
 import io
-import json
+import re
 import sqlite3
 import zipfile
 from pathlib import Path
@@ -37,6 +50,53 @@ TABLES = {
         "raw_dir": _RAW_DIR / "statscan_33100500",
     },
 }
+
+# Exact column names confirmed from CSV inspection
+_NAICS_COL = "North American Industry Classification System (NAICS)"
+_CAPEX_TYPE_COL = "Capital and repair expenditures"
+_RATIO_MEASURE_COL = (
+    "Balance sheet and income statement components, selected financial ratios"
+)
+_VALUE_COL = "VALUE"
+
+# Financial ratio measures relevant to the Benchmark Agent
+# (debt coverage, leverage, liquidity, profitability)
+_RELEVANT_RATIO_MEASURES = {
+    "Asset-to-equity ratio",
+    "Debt-to-equity ratio",
+    "Current ratio",
+    "Return on equity",
+    "Return on assets",
+    "Net profit margin",
+    "Total debt",
+    "Total assets",
+    "Cash and deposits",
+    "Fixed assets, net value",
+    "Inventory",
+    "Income or loss before income taxes",
+    "Income or loss after income taxes",
+    "Labour expenses, total",
+    "Depreciation, depletion and amortization",
+    "Interest expense, mortgages",
+    "Interest expense, debt securities",
+    "Asset current total",
+    "Dividend payout ratio",
+}
+
+
+def _extract_naics_code(label: str) -> str:
+    """Extract the numeric NAICS code from a bracket-notation label.
+
+    E.g. 'Food manufacturing [311]'     → '311'
+         'Manufacturing [31-33]'         → '31'   (takes leading digits)
+         'All Industries'                → ''      (no code → skip)
+    """
+    m = re.search(r"\[([0-9][0-9A-Za-z\-]*)\]", str(label))
+    if not m:
+        return ""
+    raw = m.group(1)
+    # For ranges like '31-33', keep only the leading segment
+    return raw.split("-")[0]
 
 
 def _download_table(pid: str, raw_dir: Path) -> Path:
@@ -71,92 +131,127 @@ def _download_table(pid: str, raw_dir: Path) -> Path:
         return raw_dir / csv_name
 
 
+def _get_ref_date_col(df: pd.DataFrame) -> str | None:
+    """Return the REF_DATE column name, handling the UTF-8 BOM prefix."""
+    for col in df.columns:
+        if "REF_DATE" in col.upper():
+            return col
+    return None
+
+
 def _ingest_capex(csv_path: Path, conn: sqlite3.Connection) -> None:
-    """Clean and insert capex data (34-10-0035-01) into capex_benchmarks table."""
+    """Clean and insert capex data (34-10-0035-01) into capex_benchmarks table.
+
+    Stores only 'Capital expenditures' rows (not Repair) to keep values
+    directly comparable to a project's proposed capex.
+    NAICS codes are extracted from bracket notation and stored as numeric strings.
+    """
     print(f"    Reading capex CSV ({csv_path.stat().st_size // 1024} KB)…")
     df = pd.read_csv(csv_path, encoding="latin-1", low_memory=False)
 
-    # Standardise column names
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+    # Locate the REF_DATE column (may have BOM prefix on first col)
+    ref_col = _get_ref_date_col(df)
+    if ref_col:
+        df["_year"] = pd.to_numeric(df[ref_col].astype(str).str[:4], errors="coerce")
+        df = df[df["_year"] >= 2018]
+    else:
+        df["_year"] = 0
 
-    # Keep only recent data
-    year_col = next((c for c in df.columns if "ref_date" in c or "year" in c), None)
-    if year_col:
-        df[year_col] = pd.to_numeric(df[year_col].astype(str).str[:4], errors="coerce")
-        df = df[df[year_col] >= 2018]
+    # Keep only Capital expenditures (not Repair)
+    if _CAPEX_TYPE_COL in df.columns:
+        df = df[df[_CAPEX_TYPE_COL] == "Capital expenditures"]
 
-    # Identify NAICS, value columns
-    naics_col = next((c for c in df.columns if "naics" in c or "industry" in c), None)
-    value_col = next((c for c in df.columns if c == "value"), None)
-    asset_col = next((c for c in df.columns if "asset" in c or "type" in c), None)
-
-    if not all([naics_col, value_col]):
-        print(f"    WARNING: Could not identify required columns in {csv_path.name}. Skipping.")
+    if _NAICS_COL not in df.columns:
+        print(f"    WARNING: NAICS column not found. Columns: {df.columns.tolist()}")
         return
 
-    # Filter numeric values only
-    df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
-    df = df.dropna(subset=[value_col, naics_col])
+    if _VALUE_COL not in df.columns:
+        print(f"    WARNING: VALUE column not found.")
+        return
 
-    # Aggregate to median per NAICS + asset_type + year
-    group_cols = [c for c in [year_col, naics_col, asset_col] if c]
-    agg = df.groupby(group_cols)[value_col].median().reset_index()
-    agg.columns = list(group_cols) + ["median_capex_cad"]
+    # Parse NAICS codes from bracket notation
+    df["_naics_code"] = df[_NAICS_COL].apply(_extract_naics_code)
+    df = df[df["_naics_code"] != ""]  # drop 'All Industries' and un-coded rows
 
-    # Normalise for DB
+    # Parse values
+    df["_value"] = pd.to_numeric(df[_VALUE_COL], errors="coerce")
+    df = df.dropna(subset=["_value", "_naics_code"])
+
+    # Asset type (capex category)
+    asset_col = _CAPEX_TYPE_COL if _CAPEX_TYPE_COL in df.columns else None
+
+    group_cols = ["_year", "_naics_code"]
+    if asset_col:
+        df["_asset_type"] = df[asset_col]
+        group_cols.append("_asset_type")
+
+    agg = df.groupby(group_cols)["_value"].median().reset_index()
+
     out = pd.DataFrame({
-        "ref_year": agg[year_col] if year_col else 0,
-        "naics": agg[naics_col].astype(str).str[:6],
-        "asset_type": agg[asset_col].astype(str) if asset_col else "unknown",
-        "median_capex_cad": agg["median_capex_cad"],
+        "ref_year": agg["_year"].astype(int),
+        "naics": agg["_naics_code"].astype(str),
+        "asset_type": agg["_asset_type"].astype(str) if "_asset_type" in agg.columns else "Capital expenditures",
+        "median_capex_millions_cad": agg["_value"],
     })
 
     out.to_sql("capex_benchmarks", conn, if_exists="replace", index=False)
     print(f"    capex_benchmarks: {len(out)} rows inserted")
+    print(f"    Sample NAICS codes: {sorted(out['naics'].unique())[:10]}")
 
 
 def _ingest_ratios(csv_path: Path, conn: sqlite3.Connection) -> None:
-    """Clean and insert financial ratio data (33-10-0500-01) into financial_ratios table."""
+    """Clean and insert financial ratio data (33-10-0500-01) into financial_ratios table.
+
+    Filters to the subset of measures relevant to the Benchmark Agent
+    (leverage, liquidity, profitability). NAICS codes parsed from brackets.
+    """
     print(f"    Reading ratios CSV ({csv_path.stat().st_size // 1024} KB)…")
     df = pd.read_csv(csv_path, encoding="latin-1", low_memory=False)
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
 
-    year_col = next((c for c in df.columns if "ref_date" in c), None)
-    naics_col = next((c for c in df.columns if "naics" in c or "industry" in c), None)
-    measure_col = next((c for c in df.columns if "measure" in c or "indicator" in c or "variable" in c), None)
-    value_col = next((c for c in df.columns if c == "value"), None)
-    size_col = next((c for c in df.columns if "size" in c or "employment" in c), None)
+    ref_col = _get_ref_date_col(df)
+    if ref_col:
+        df["_year"] = pd.to_numeric(df[ref_col].astype(str).str[:4], errors="coerce")
+        df = df[df["_year"] >= 2018]
+    else:
+        df["_year"] = 0
 
-    if not all([naics_col, value_col]):
-        print(f"    WARNING: Could not identify required columns. Skipping ratios.")
+    if _NAICS_COL not in df.columns:
+        print(f"    WARNING: NAICS column not found in ratios CSV.")
+        return
+    if _RATIO_MEASURE_COL not in df.columns:
+        print(f"    WARNING: Measure column not found in ratios CSV.")
+        return
+    if _VALUE_COL not in df.columns:
+        print(f"    WARNING: VALUE column not found.")
         return
 
-    if year_col:
-        df[year_col] = pd.to_numeric(df[year_col].astype(str).str[:4], errors="coerce")
-        df = df[df[year_col] >= 2018]
+    # Parse NAICS codes
+    df["_naics_code"] = df[_NAICS_COL].apply(_extract_naics_code)
+    df = df[df["_naics_code"] != ""]
 
-    # Filter to SME size class
-    if size_col:
-        df = df[df[size_col].astype(str).str.contains("Small|Medium|1 to 499|SME", case=False, na=False)]
+    # Filter to relevant measures only (keeps the DB lean and queries fast)
+    df = df[df[_RATIO_MEASURE_COL].isin(_RELEVANT_RATIO_MEASURES)]
 
-    df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
-    df = df.dropna(subset=[value_col, naics_col])
+    df["_value"] = pd.to_numeric(df[_VALUE_COL], errors="coerce")
+    df = df.dropna(subset=["_value", "_naics_code"])
 
-    group_cols = [c for c in [year_col, naics_col, measure_col] if c]
-    if not group_cols:
+    if df.empty:
+        print("    WARNING: No rows remain after filtering. Check measure names.")
         return
 
-    agg = df.groupby(group_cols)[value_col].median().reset_index()
+    group_cols = ["_year", "_naics_code", _RATIO_MEASURE_COL]
+    agg = df.groupby(group_cols)["_value"].median().reset_index()
 
     out = pd.DataFrame({
-        "ref_year": agg[year_col] if year_col else 0,
-        "naics": agg[naics_col].astype(str).str[:6],
-        "measure": agg[measure_col].astype(str) if measure_col else "unknown",
-        "median_value": agg[value_col],
+        "ref_year": agg["_year"].astype(int),
+        "naics": agg["_naics_code"].astype(str),
+        "measure": agg[_RATIO_MEASURE_COL].astype(str),
+        "median_value_millions_cad": agg["_value"],
     })
 
     out.to_sql("financial_ratios", conn, if_exists="replace", index=False)
     print(f"    financial_ratios: {len(out)} rows inserted")
+    print(f"    Measures stored: {sorted(out['measure'].unique())}")
 
 
 def run() -> None:

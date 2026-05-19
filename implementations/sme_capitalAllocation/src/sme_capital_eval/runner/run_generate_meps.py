@@ -14,11 +14,12 @@ Usage (Ollama):
 """
 
 import argparse
+import time
 import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional, TypeVar
 
 from dotenv import load_dotenv
 
@@ -46,6 +47,43 @@ from ..utils.timing import iso_now, timed
 
 
 load_dotenv()
+
+_T = TypeVar("_T")
+
+# Error strings that signal a transient rate-limit (vs. a hard auth/config failure)
+_RATE_LIMIT_SIGNALS = ("429", "RESOURCE_EXHAUSTED", "rate limit", "quota", "retry")
+
+
+def _with_retry(
+    fn: Callable[[], _T],
+    max_retries: int = 3,
+    base_delay: float = 10.0,
+) -> _T:
+    """Run *fn* with exponential-backoff retry on transient rate-limit errors.
+
+    Retries up to *max_retries* additional times (total attempts = max_retries+1).
+    Wait time doubles each attempt: base_delay, 2*base_delay, 4*base_delay, ...
+    Non-rate-limit exceptions are re-raised immediately.
+    """
+    last_exc: Optional[Exception] = None
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001
+            exc_str = str(exc).lower()
+            is_rate_limit = any(sig.lower() in exc_str for sig in _RATE_LIMIT_SIGNALS)
+            if is_rate_limit and attempt < max_retries:
+                delay = base_delay * (2 ** attempt)
+                print(
+                    f"\n      [retry {attempt + 1}/{max_retries}] Rate-limited — waiting {delay:.0f}s…",
+                    end=" ",
+                    flush=True,
+                )
+                time.sleep(delay)
+                last_exc = exc
+            else:
+                raise
+    raise last_exc  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -106,16 +144,18 @@ def process_case(
         plan_ms = 0.0
         try:
             with timed() as t:
-                plan_prompt, plan_parsed, plan_err, plan_raw = planner.run(
-                    slim_context={
-                        "case_id": case.case_id,
-                        "industry": case.company_profile.get("industry"),
-                        "asset_archetype": case.asset_archetype(),
-                        "required_capex": case.required_capex(),
-                        "strategic_rationale": case.expansion_plan.get("strategic_rationale", ""),
-                        "risk_factors": case.expansion_plan.get("risk_factors", []),
-                    },
-                    lf_trace=lf_trace,
+                plan_prompt, plan_parsed, plan_err, plan_raw = _with_retry(
+                    lambda: planner.run(
+                        slim_context={
+                            "case_id": case.case_id,
+                            "industry": case.company_profile.get("industry"),
+                            "asset_archetype": case.asset_archetype(),
+                            "required_capex": case.required_capex(),
+                            "strategic_rationale": case.expansion_plan.get("strategic_rationale", ""),
+                            "risk_factors": case.expansion_plan.get("risk_factors", []),
+                        },
+                        lf_trace=lf_trace,
+                    )
                 )
             plan_ms = t.elapsed_ms
         except Exception as exc:
@@ -130,17 +170,17 @@ def process_case(
 
         def _run_sponsor():
             with timed() as t:
-                out = sponsor.run(case.sponsor_context(), lf_trace)
+                out = _with_retry(lambda: sponsor.run(case.sponsor_context(), lf_trace))
             return out, t.elapsed_ms
 
         def _run_governance():
             with timed() as t:
-                out = governance.run(case.governance_context(), lf_trace)
+                out = _with_retry(lambda: governance.run(case.governance_context(), lf_trace))
             return out, t.elapsed_ms
 
         def _run_benchmark():
             with timed() as t:
-                out = benchmark.run(case.benchmark_context(), plan_parsed, lf_trace)
+                out = _with_retry(lambda: benchmark.run(case.benchmark_context(), plan_parsed, lf_trace))
             return out, t.elapsed_ms
 
         if workers > 1:
@@ -198,12 +238,14 @@ def process_case(
                     agg_raw,
                     rule_decision,
                     rule_applied,
-                ) = aggregator.run(
-                    aggregator_context=case.aggregator_context(sp_parsed, gov_parsed, bm_parsed),
-                    sponsor_parsed=sp_parsed,
-                    governance_parsed=gov_parsed,
-                    benchmark_parsed=bm_parsed,
-                    lf_trace=lf_trace,
+                ) = _with_retry(
+                    lambda: aggregator.run(
+                        aggregator_context=case.aggregator_context(sp_parsed, gov_parsed, bm_parsed),
+                        sponsor_parsed=sp_parsed,
+                        governance_parsed=gov_parsed,
+                        benchmark_parsed=bm_parsed,
+                        lf_trace=lf_trace,
+                    )
                 )
             agg_ms = t.elapsed_ms
         except Exception as exc:
@@ -315,6 +357,8 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=1,
                         help="1=sequential (recommended for free Gemini plan)")
     parser.add_argument("--out", default="meps/", help="Output directory for MEPs")
+    parser.add_argument("--delay", type=float, default=0.0,
+                        help="Seconds to wait between cases (helpful on Gemini free tier, e.g. 5.0)")
     args = parser.parse_args()
 
     # Resolve model default per provider
@@ -369,10 +413,14 @@ def main() -> None:
                 case, planner, sponsor, governance, bm, agg,
                 config, run_id, out_dir, lf_client, args.workers,
             )
-            print(f"OK \u2192 {path}")
+            print(f"OK → {path}")
         except Exception as exc:
             print(f"ERROR: {exc}")
             traceback.print_exc()
+
+        if args.delay > 0 and i < len(cases):
+            print(f"  [pacing] waiting {args.delay}s before next case…")
+            time.sleep(args.delay)
 
     print(f"\nDone. MEPs written to: {out_dir}")
 
