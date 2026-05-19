@@ -27,6 +27,35 @@ OPENAI_API_KEY=your_openai_api_key_here      # for --provider openai
 
 ---
 
+## Fast Track — Unified Evaluation Pipeline (One-Command Execution)
+
+If you want to run the entire evaluation suite—MEP generation with isolated timestamped runs, decision accuracy scoring, trace citation verification, error taxonomy classification, and the terminal summary table—in a single command, run:
+
+### Google Gemini 2.5 Flash (Default)
+```bash
+uv run \
+  --env-file "$(pwd)/.env" \
+  --directory implementations/sme_capitalAllocation \
+  -m sme_capital_eval.runner.run_pipeline \
+  --provider gemini \
+  --model gemini-2.5-flash \
+  --workers 1 \
+  --delay 5.0
+```
+
+### OpenAI GPT-4o-Mini
+```bash
+uv run \
+  --env-file "$(pwd)/.env" \
+  --directory implementations/sme_capitalAllocation \
+  -m sme_capital_eval.runner.run_pipeline \
+  --provider openai \
+  --model gpt-4o-mini \
+  --workers 4
+```
+
+---
+
 ## Step 1 — Data Engineering (run once, all providers share the same data)
 
 ```bash

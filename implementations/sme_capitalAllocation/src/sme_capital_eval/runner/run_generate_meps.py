@@ -359,6 +359,10 @@ def main() -> None:
     parser.add_argument("--out", default="meps/", help="Output directory for MEPs")
     parser.add_argument("--delay", type=float, default=0.0,
                         help="Seconds to wait between cases (helpful on Gemini free tier, e.g. 5.0)")
+    parser.add_argument("--timestamped", action="store_true",
+                        help="Append execution timestamp to output directory to prevent overwriting previous runs")
+    parser.add_argument("--run_name", default=None,
+                        help="Specify a custom sub-directory name for the output folder (overrides split and timestamped)")
     args = parser.parse_args()
 
     # Resolve model default per provider
@@ -380,8 +384,16 @@ def main() -> None:
         "provider": args.provider,
         "config_name": f"{args.provider}_{safe_model}",
     }
+    import datetime
     run_id = str(uuid.uuid4())
-    out_dir = str(Path(args.out) / config["config_name"] / args.split)
+    if args.run_name:
+        out_name = args.run_name
+    else:
+        out_name = args.split
+        if args.timestamped:
+            now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            out_name = f"{args.split}_{now_str}"
+    out_dir = str(Path(args.out) / config["config_name"] / out_name)
     Path(out_dir).mkdir(parents=True, exist_ok=True)
 
     print(f"Loading cases   : split={args.split}")
