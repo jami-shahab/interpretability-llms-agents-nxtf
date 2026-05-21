@@ -46,7 +46,10 @@ Output: {"agent": "benchmark", "decision": "PASS", "flags": [], "comparisons": {
 [NOTE ON MISSING DATA]
 If statscan_query_tool returns empty results (database not yet built), note this in rationale but still evaluate archetype rules from the proposal text. Do not hallucinate benchmark numbers.
 
-[OUTPUT FORMAT — STRICT JSON ONLY]
+[OUTPUT FORMAT]
+You must use the statscan_query_tool to gather data BEFORE rendering your final decision.
+Once you have the data, output your final decision as a strict JSON block, like this:
+
 {
   "agent": "benchmark",
   "decision": "PASS | FAIL | ESCALATE | unanswerable",
@@ -59,8 +62,6 @@ If statscan_query_tool returns empty results (database not yet built), note this
   },
   "rationale": "<one sentence based on external benchmarks only>"
 }
-
-Output JSON only. No preamble.
 
 [BENCHMARK DATA]
 enterprise_naics: {enterprise_naics}

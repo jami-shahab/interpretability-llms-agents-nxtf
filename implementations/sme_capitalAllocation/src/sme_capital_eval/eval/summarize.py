@@ -38,8 +38,9 @@ def main() -> None:
         "sponsor_correct",
         "governance_correct",
         "benchmark_correct",
-        "must_flag_hit_rate",
-        "must_cite_hit_rate",
+        "governance_flags_raised",
+        "benchmark_tool_calls",
+        "override_applied",
         "latency_sec",
         "all_parse_ok",
     ]
@@ -50,26 +51,41 @@ def main() -> None:
 
     # Print readable summary
     n = len(df)
-    print(f"\n{'='*50}")
+    print(f"\n{'='*55}")
     print(f"SME Capital Eval Summary — {n} cases")
-    print(f"{'='*50}")
+    print(f"{'='*55}")
     if "final_decision_correct" in df.columns:
         acc = df["final_decision_correct"].mean()
-        print(f"Final Decision Accuracy : {acc:.1%}  ({int(acc*n)}/{n})")
+        print(f"Consolidated Decision Accuracy (IC): {acc:.1%}  ({int(acc*n)}/{n})")
+    
+    # Granular Agent Accuracies
+    if "sponsor_correct" in df.columns:
+        sp_acc = df["sponsor_correct"].mean()
+        print(f"  Sponsor Lens Accuracy   : {sp_acc:.1%}  ({int(sp_acc*n)}/{n})")
+    if "governance_correct" in df.columns:
+        gov_acc = df["governance_correct"].mean()
+        print(f"  Governance Lens Accuracy: {gov_acc:.1%}  ({int(gov_acc*n)}/{n})")
+    if "benchmark_correct" in df.columns:
+        bm_acc = df["benchmark_correct"].mean()
+        print(f"  Benchmark Lens Accuracy : {bm_acc:.1%}  ({int(bm_acc*n)}/{n})")
+        
     if "per_lens_accuracy" in df.columns:
-        print(f"Per-Lens Accuracy       : {df['per_lens_accuracy'].mean():.1%}")
-    if "must_flag_hit_rate" in df.columns:
-        print(f"Must-Flag Hit Rate      : {df['must_flag_hit_rate'].mean():.1%}")
-    if "must_cite_hit_rate" in df.columns:
-        print(f"Must-Cite Hit Rate      : {df['must_cite_hit_rate'].mean():.1%}")
+        print(f"Per-Lens Accuracy (Avg)   : {df['per_lens_accuracy'].mean():.1%}")
+    if "override_applied" in df.columns:
+        print(f"Meta-Reasoning Overrides  : {df['override_applied'].sum()}")
+    if "governance_flags_raised" in df.columns:
+        print(f"Total Gov Flags Raised    : {df['governance_flags_raised'].sum()}")
+    if "benchmark_tool_calls" in df.columns:
+        print(f"Total Benchmark Tool Calls: {df['benchmark_tool_calls'].sum()}")
     if "latency_sec" in df.columns:
-        print(f"Avg Latency (s)         : {df['latency_sec'].mean():.2f}")
+        print(f"Avg Latency (s)           : {df['latency_sec'].mean():.2f}")
     if "all_parse_ok" in df.columns:
-        print(f"Parse Reliability       : {df['all_parse_ok'].mean():.1%}")
-    print(f"{'='*50}")
+        print(f"Parse Reliability         : {df['all_parse_ok'].mean():.1%}")
+    print(f"{'='*55}")
     print(f"\nPer-case breakdown:")
     display_cols = ["case_id", "expected_final", "predicted_final",
-                    "final_decision_correct", "per_lens_accuracy", "latency_sec"]
+                    "final_decision_correct", "override_applied", "sponsor_correct", "governance_correct", 
+                    "benchmark_correct", "latency_sec"]
     display_cols = [c for c in display_cols if c in df.columns]
     print(df[display_cols].to_string(index=False))
     print(f"\nSummary CSV written to: {args.out}")

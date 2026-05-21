@@ -76,6 +76,7 @@ class BenchmarkAgent:
         enterprise_naics = plan_parsed.get("enterprise_naics", "00")
         project_naics = plan_parsed.get("project_naics", "00")
         prompt = self._build_prompt(slim_context, enterprise_naics, project_naics)
+        self._query_tool.call_log.clear()
 
         agent = Agent(
             role="Industry Benchmark Appraiser",
@@ -109,4 +110,5 @@ class BenchmarkAgent:
                 "rationale": "Benchmark parse failed.",
             }
 
-        return prompt, parsed, not ok, raw_text, []
+        tool_trace = list(self._query_tool.call_log)
+        return prompt, parsed, not ok, raw_text, tool_trace

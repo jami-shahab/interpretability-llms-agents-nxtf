@@ -33,6 +33,11 @@ def parse_strict(
     if cleaned.endswith("```"):
         cleaned = cleaned[:-3]
     cleaned = cleaned.strip()
+    
+    import re
+    match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if match:
+        cleaned = match.group(0)
 
     # Try strict JSON first
     parsed: Any = {}

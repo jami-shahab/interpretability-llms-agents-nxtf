@@ -199,6 +199,7 @@ class StatCanQueryTool(BaseTool):
     def __init__(self, adapter: Optional[BenchmarkQueryPort] = None, **kwargs) -> None:
         super().__init__(**kwargs)
         object.__setattr__(self, "_adapter", adapter or SQLiteBenchmarkAdapter())
+        object.__setattr__(self, "call_log", [])
 
     def _run(  # noqa: PLR0911
         self,
@@ -209,6 +210,12 @@ class StatCanQueryTool(BaseTool):
         industry: str = "",
     ) -> str:
         """Execute the benchmark lookup and return results as a JSON string."""
+        self.call_log.append({
+            "query_type": query_type,
+            "naics": naics,
+            "measure": measure,
+            "asset_type": asset_type,
+        })
         try:
             if query_type == "capex_norm":
                 rows = self._adapter.query_capex_norm(naics, asset_type or None)

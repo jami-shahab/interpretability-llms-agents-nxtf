@@ -22,7 +22,7 @@ from ..utils.llm_adapter import GeminiLLMAdapter, LLMAdapterPort
 load_dotenv()
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "aggregator.txt"
-_REQUIRED_KEYS = ["agent", "final_decision", "decision_path", "overrides", "rationale"]
+_REQUIRED_KEYS = ["agent", "final_decision", "decision_path", "override_applied", "override_direction", "rationale"]
 
 
 
@@ -187,16 +187,14 @@ class AggregatorAgent:
         raw_text: str = getattr(result, "raw", None) or str(result)
         parsed, ok = parse_strict(raw_text, required_keys=_REQUIRED_KEYS)
 
-        # Enforce rule engine's decision (LLM cannot override)
-        if parsed:
-            parsed["final_decision"] = rule_decision
-            parsed["decision_path"] = rule_applied
-        else:
+        # Trust the LLM's meta-reasoned decision
+        if not parsed:
             parsed = {
                 "agent": "verifier",
                 "final_decision": rule_decision,
                 "decision_path": rule_applied,
-                "overrides": [],
+                "override_applied": False,
+                "override_direction": "",
                 "rationale": f"Aggregator parse failed. Rule engine determined: {rule_decision}.",
                 "required_actions": [],
             }

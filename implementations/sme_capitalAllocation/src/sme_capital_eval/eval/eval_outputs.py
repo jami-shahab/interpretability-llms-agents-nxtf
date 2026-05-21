@@ -68,34 +68,7 @@ def score_per_lens(
     return results
 
 
-def score_must_flags(must_flag: list, governance_parsed: dict, benchmark_parsed: dict) -> float:
-    """Check whether all must_flag items appear in agent flag lists.
-
-    Returns
-    -------
-    float
-        Fraction of must_flag items that were correctly raised.
-    """
-    if not must_flag:
-        return 1.0
-    all_flags = set(governance_parsed.get("flags", [])) | set(benchmark_parsed.get("flags", []))
-    hits = sum(1 for f in must_flag if f in all_flags)
-    return round(hits / len(must_flag), 4)
-
-
-def score_must_cites(must_cite: list, governance_raw: str, benchmark_raw: str) -> float:
-    """Check whether must_cite items appear (substring match) in raw agent output.
-
-    Returns
-    -------
-    float
-        Fraction of must_cite items found in the raw text.
-    """
-    if not must_cite:
-        return 1.0
-    combined = (governance_raw + " " + benchmark_raw).lower()
-    hits = sum(1 for c in must_cite if c.lower() in combined)
-    return round(hits / len(must_cite), 4)
+# (must_flag and must_cite scorers removed in favor of direct metric counting)
 
 
 # ---------------------------------------------------------------------------
@@ -147,14 +120,10 @@ def evaluate_mep(mep: dict, use_judge: bool = False) -> dict:
         "rule_applied": aggregator.get("rule_applied", ""),
         "final_decision_correct": score_final_decision(expected_final, predicted_final),
         **per_lens,
-        "must_flag_hit_rate": score_must_flags(
-            eval_metrics.get("must_flag", []), gov_parsed, bm_parsed
-        ),
-        "must_cite_hit_rate": score_must_cites(
-            eval_metrics.get("must_cite", []),
-            governance.get("raw_text", ""),
-            benchmark.get("raw_text", ""),
-        ),
+        "governance_flags_raised": len(gov_parsed.get("flags", [])),
+        "benchmark_tool_calls": len(benchmark.get("tool_trace", [])),
+        "override_applied": agg_parsed.get("override_applied", False),
+        "override_direction": agg_parsed.get("override_direction", ""),
         "latency_sec": round(total_ms / 1000.0, 3),
         "planner_ms": timestamps.get("planner_ms", 0),
         "sponsor_ms": timestamps.get("sponsor_ms", 0),
