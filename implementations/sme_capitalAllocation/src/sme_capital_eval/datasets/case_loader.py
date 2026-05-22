@@ -19,7 +19,7 @@ TEST_IDS = {"CASE_02", "CASE_03", "CASE_05", "CASE_06", "CASE_08", "CASE_09", "C
 
 # parents[3] = implementations/sme_capitalAllocation/
 _SME_ROOT = Path(__file__).parents[3]
-_SYNTHETIC_PATH = _SME_ROOT / "docs" / "synthetic_dataset.json"
+_SYNTHETIC_PATH = _SME_ROOT / "data" / "synthetic_dataset.json"
 _PROCESSED_DIR = _SME_ROOT / "data" / "processed"
 
 
@@ -63,7 +63,7 @@ def load_cases(
 
     Parameters
     ----------
-    split : {'test', 'fewshot', 'all'}
+    split : {'test1', 'test2', 'fewshot', 'all'}
         Which subset to return.
     source_path : Path, optional
         Override the default synthetic dataset path.
@@ -75,14 +75,23 @@ def load_cases(
     List[CapitalCase]
         Ordered list of cases for the requested split.
     """
-    raw_cases = _load_all_raw(source_path)
-
-    if split == "fewshot":
-        selected = [r for r in raw_cases if r["case_id"] in FEW_SHOT_IDS]
-    elif split == "test":
-        selected = [r for r in raw_cases if r["case_id"] in TEST_IDS]
-    else:  # "all"
-        selected = raw_cases
+    if split == "test2":
+        v3b_path = source_path or _SME_ROOT / "data" / "v3b_stellar_variants.json"
+        with open(v3b_path) as f:
+            selected = json.load(f)
+    else:
+        raw_cases = _load_all_raw(source_path)
+        if split == "fewshot":
+            selected = [r for r in raw_cases if r["case_id"] in FEW_SHOT_IDS]
+        elif split == "test1":
+            selected = [r for r in raw_cases if r["case_id"] in TEST_IDS]
+        else:  # "all"
+            selected = raw_cases
+            # Append test2 to 'all' as well
+            v3b_path = source_path or _SME_ROOT / "data" / "v3b_stellar_variants.json"
+            if v3b_path.exists():
+                with open(v3b_path) as f:
+                    selected.extend(json.load(f))
 
     cases = [_raw_to_case(r) for r in selected]
     if n is not None:

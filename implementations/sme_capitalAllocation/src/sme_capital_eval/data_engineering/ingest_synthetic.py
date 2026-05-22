@@ -14,7 +14,7 @@ from pathlib import Path
 
 # parents[3] = implementations/sme_capitalAllocation/
 _ROOT = Path(__file__).parents[3]
-_SOURCE = _ROOT / "docs" / "synthetic_dataset.json"
+_SOURCE = _ROOT / "data" / "synthetic_dataset.json"
 _OUT_DIR = _ROOT / "data" / "processed"
 
 FEW_SHOT_IDS = {"CASE_01", "CASE_04", "CASE_07"}
