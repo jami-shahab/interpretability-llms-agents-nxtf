@@ -90,11 +90,18 @@ def load_cases(
         elif split == "test1":
             selected = [r for r in raw_cases if r["case_id"] in TEST_IDS]
         else:  # "all"
-            selected = raw_cases
+            # Start with test1 + fewshot, but specifically exclude 04, 05, 07
+            valid_raw = [r for r in raw_cases if r["case_id"] not in ("CASE_04", "CASE_05", "CASE_07")]
+            selected = valid_raw
             # Append test2 to 'all' as well
             v3b_path = source_path or _SME_ROOT / "data" / "v3b_stellar_variants.json"
             if v3b_path.exists():
                 with open(v3b_path) as f:
+                    selected.extend(json.load(f))
+            # Append test3 to 'all' as well
+            v4_path = source_path or _SME_ROOT / "data" / "v4_mitigation_variants.json"
+            if v4_path.exists():
+                with open(v4_path) as f:
                     selected.extend(json.load(f))
 
     cases = [_raw_to_case(r) for r in selected]
