@@ -50,7 +50,7 @@ def main() -> None:
                         help="LLM provider (default: gemini)")
     parser.add_argument("--model", default=None,
                         help="Specific model string. Defaults: gemini-2.5-flash / gpt-4o-mini / gemma4:e2b")
-    parser.add_argument("--split", type=str, default="test1", choices=["test1", "test2", "fewshot", "all"],
+    parser.add_argument("--split", type=str, default="test1", choices=["test1", "test2", "test3", "fewshot", "all"],
                         help="Cases split to run (default: test)")
     parser.add_argument("--n", type=int, default=None,
                         help="Number of cases to evaluate (default: all in split)")

@@ -59,6 +59,7 @@ def apply_decision_rules(
     sponsor_dec = sponsor.get("decision", "unanswerable")
     gov_dec = governance.get("decision", "unanswerable")
     bench_dec = benchmark.get("decision", "unanswerable")
+    gov_mitigations = set(governance.get("mitigations_found", []))
 
     # Rule 1: All PASS
     if all(d == "PASS" for d in [sponsor_dec, gov_dec, bench_dec]):
@@ -70,15 +71,23 @@ def apply_decision_rules(
 
     # Rule 3: Liquidity floor violation (hard stop — balance sheet ruin)
     if "cash_floor_violation" in gov_flags:
-        return "DECLINE", "Rule 3: Liquidity Floor Violation — cash drops below $250k minimum"
+        if "lease_alternative_available" in gov_mitigations:
+            pass # Mitigated! Fall through to see if we can PROCEED_WITH_MITIGATION
+        else:
+            return "DECLINE", "Rule 3: Liquidity Floor Violation — cash drops below $250k minimum"
 
     # Rule 4: SAMP violation (ISO 55000 lifecycle breach — hard stop)
     if {"SAMP_deferred_maintenance_violation", "SAMP_violation"} & gov_flags:
         return "DECLINE", "Rule 4: SAMP Violation — ISO 55000 asset lifecycle mandate breached"
 
     # Rule 5: Policy breach requiring board (leverage or IC authority)
-    if {"leverage_ceiling_breach", "IC_authority_exceeded"} & gov_flags:
-        return "ESCALATE", "Rule 5: Policy Breach — leverage >2.5x or capex exceeds IC authority ($2M)"
+    if "IC_authority_exceeded" in gov_flags:
+        return "ESCALATE", "Rule 5a: Policy Breach — capex exceeds IC authority ($2M)"
+    if "leverage_ceiling_breach" in gov_flags:
+        if "edc_guarantee_present" in gov_mitigations or "bdc_support_present" in gov_mitigations:
+            pass # Mitigated! Fall through
+        else:
+            return "ESCALATE", "Rule 5b: Policy Breach — leverage >2.5x"
 
     # Rule 6: Operational data conflict
     if "conflicting_utilization_data" in bench_flags or bench_dec == "ESCALATE":
@@ -90,11 +99,16 @@ def apply_decision_rules(
 
     # Rule 8: Financing limit breach without sub-debt blend
     if "financing_limit_breach" in gov_flags:
-        return "ESCALATE", "Rule 8: Financing Structure Breach — single draw >$1.15M without BDC blend"
+        if "edc_guarantee_present" in gov_mitigations or "bdc_support_present" in gov_mitigations:
+            pass # Mitigated! Fall through
+        else:
+            return "ESCALATE", "Rule 8: Financing Structure Breach — single draw >$1.15M without BDC/EDC blend"
 
     # Rule 9: Sponsor PASS + fixable governance issue → proceed with mitigations
     if sponsor_dec == "PASS" and gov_dec == "FAIL":
-        return "PROCEED_WITH_MITIGATION", "Rule 9: Strong ROI with fixable financing/governance structure"
+        if gov_mitigations:
+            return "PROCEED_WITH_MITIGATION", f"Rule 9: Strong ROI with structural breach mitigated by: {', '.join(gov_mitigations)}"
+        return "ESCALATE", "Rule 9: Strong ROI but unmitigated governance breach requires manual structuring"
 
     # Rule 10: Any unanswerable lens → escalate for human review
     if "unanswerable" in {sponsor_dec, gov_dec, bench_dec}:

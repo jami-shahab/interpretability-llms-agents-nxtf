@@ -352,7 +352,8 @@ def main() -> None:
                         help="Model name. Defaults: gemini-2.0-flash-lite / gemma4:e2b / gpt-4o-mini")
     parser.add_argument("--ollama_url", default="http://localhost:11434",
                         help="Ollama server URL (only used with --provider ollama)")
-    parser.add_argument("--split", type=str, default="test1", choices=["test1", "test2", "fewshot", "all"],)
+    parser.add_argument("--split", type=str, default="test1", choices=["test1", "test2", "test3", "fewshot", "all"],
+                        help="Which dataset split to run")
     parser.add_argument("--n", type=int, default=None, help="Number of cases (default: all in split)")
     parser.add_argument("--workers", type=int, default=1,
                         help="1=sequential (recommended for free Gemini plan)")

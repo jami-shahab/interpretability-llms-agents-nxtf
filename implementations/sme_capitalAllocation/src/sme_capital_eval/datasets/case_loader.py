@@ -15,7 +15,7 @@ from .capital_case import CapitalCase
 FEW_SHOT_IDS = {"CASE_01", "CASE_04", "CASE_07"}
 
 # Remaining cases form the evaluation test set
-TEST_IDS = {"CASE_02", "CASE_03", "CASE_05", "CASE_06", "CASE_08", "CASE_09", "CASE_10"}
+TEST_IDS = {"CASE_02", "CASE_03", "CASE_06", "CASE_08", "CASE_09", "CASE_10"}
 
 # parents[3] = implementations/sme_capitalAllocation/
 _SME_ROOT = Path(__file__).parents[3]
@@ -78,6 +78,10 @@ def load_cases(
     if split == "test2":
         v3b_path = source_path or _SME_ROOT / "data" / "v3b_stellar_variants.json"
         with open(v3b_path) as f:
+            selected = json.load(f)
+    elif split == "test3":
+        v4_path = source_path or _SME_ROOT / "data" / "v4_mitigation_variants.json"
+        with open(v4_path) as f:
             selected = json.load(f)
     else:
         raw_cases = _load_all_raw(source_path)

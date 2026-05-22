@@ -24,6 +24,11 @@ Use financial_calc_tool for all arithmetic. Use policy_retrieval_tool to retriev
 
 5. IC AUTHORITY: If required_capex > 2,000,000 → flag "IC_authority_exceeded"
 
+6. MITIGATION EXTRACTION: You must actively look for structural mitigations that could save a deal:
+   - Check `government_programs` for `EDC_support` or `BDC_co_lending`. If true, add "edc_guarantee_present" or "bdc_support_present" to `mitigations_found`.
+   - If a `cash_floor_violation` occurs because of a large `owner_equity_cash` draw, but the asset could reasonably be financed via an equipment lease instead, add "lease_alternative_available" to `mitigations_found`.
+   Note: If a mitigation is found, STILL flag the underlying breach in the `flags` array, but ensure the mitigation is in `mitigations_found` so the IC can structure a fix.
+
 [FEW-SHOT EXAMPLES]
 
 Example 1 (CASE_01 → PASS):
@@ -45,6 +50,7 @@ Output: {"agent": "governance", "decision": "FAIL", "flags": ["cash_floor_violat
   "agent": "governance",
   "decision": "PASS | FAIL | ESCALATE | unanswerable",
   "flags": ["<flag_name>", ...],
+  "mitigations_found": ["<mitigation_name>", ...],
   "metrics": {"post_tx_leverage": <number>, "post_tx_cash": <number>},
   "rationale": "<one sentence citing the specific policy constraint violated>"
 }
