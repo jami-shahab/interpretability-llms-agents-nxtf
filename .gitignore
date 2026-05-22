@@ -35,7 +35,7 @@ implementations/sme_capitalAllocation/docs
 implementations/sme_capitalAllocation/data
 implementations/sme_capitalAllocation/output
 implementations/sme_capitalAllocation/meps
-# implementations/sme_capitalAllocation/src/sme_capital_eval/agents/prompts
+implementations/sme_capitalAllocation/src/sme_capital_eval/agents/prompts
 
 
 data
